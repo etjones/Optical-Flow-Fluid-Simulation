@@ -26,34 +26,103 @@ SOFTWARE.
 
 
 const canvas = document.getElementsByTagName('canvas')[0];
-resizeCanvas();
+// resizeCanvas();
+let { gl, ext } = getWebGLContext(canvas);
 
-let config = {
-    SIM_RESOLUTION: 128,
-    DYE_RESOLUTION: 1024,
-    CAPTURE_RESOLUTION: 512,
-    DENSITY_DISSIPATION: 1,
-    VELOCITY_DISSIPATION: 0.2,
-    PRESSURE: 0.8,
-    PRESSURE_ITERATIONS: 20,
-    CURL: 30,
-    SPLAT_RADIUS: 0.25,
-    SPLAT_FORCE: 6000,
-    SHADING: true,
-    COLORFUL: true,
-    COLOR_UPDATE_SPEED: 10,
-    PAUSED: false,
-    BACK_COLOR: { r: 0, g: 0, b: 0 },
-    TRANSPARENT: false,
-    BLOOM: true,
-    BLOOM_ITERATIONS: 8,
-    BLOOM_RESOLUTION: 256,
-    BLOOM_INTENSITY: 0.8,
-    BLOOM_THRESHOLD: 0.6,
-    BLOOM_SOFT_KNEE: 0.7,
-    SUNRAYS: true,
-    SUNRAYS_RESOLUTION: 196,
-    SUNRAYS_WEIGHT: 1.0,
+// ===========
+// = GLOBALS =
+// ===========
+let config = {};
+let pointers = [];
+let splatStack = [];
+
+let lastUpdateTime;
+let colorUpdateTimer;
+let blurProgram;
+let copyProgram;
+let clearProgram;
+let colorProgram;
+let checkerboardProgram;
+let bloomPrefilterProgram;
+let bloomBlurProgram;
+let bloomFinalProgram;
+let sunraysMaskProgram;
+let sunraysProgram;
+let splatProgram;
+let advectionProgram;
+let divergenceProgram;
+let curlProgram;
+let vorticityProgram;
+let pressureProgram;
+let gradienSubtractProgram;
+
+let displayMaterial;
+
+let dye;
+let velocity;
+let divergence;
+let curl;
+let pressure;
+let bloom;
+let bloomFramebuffers = [];
+let sunrays;
+let sunraysTemp;
+
+let ditheringTexture = createTextureAsync('LDR_LLL1_0.png');
+
+// ===============
+// = ENTRY POINT =
+// ===============
+function main(){
+    config = {
+        SIM_RESOLUTION: 128,
+        DYE_RESOLUTION: 1024,
+        CAPTURE_RESOLUTION: 512,
+        DENSITY_DISSIPATION: 1,
+        VELOCITY_DISSIPATION: 0.2,
+        PRESSURE: 0.8,
+        PRESSURE_ITERATIONS: 20,
+        CURL: 30,
+        SPLAT_RADIUS: 0.25,
+        SPLAT_FORCE: 6000,
+        SHADING: true,
+        COLORFUL: true,
+        COLOR_UPDATE_SPEED: 10,
+        PAUSED: false,
+        BACK_COLOR: { r: 0, g: 0, b: 0 },
+        TRANSPARENT: false,
+        BLOOM: true,
+        BLOOM_ITERATIONS: 8,
+        BLOOM_RESOLUTION: 256,
+        BLOOM_INTENSITY: 0.8,
+        BLOOM_THRESHOLD: 0.6,
+        BLOOM_SOFT_KNEE: 0.7,
+        SUNRAYS: true,
+        SUNRAYS_RESOLUTION: 196,
+        SUNRAYS_WEIGHT: 1.0,
+    }    
+    pointers.push(new pointerPrototype());
+
+    if (isMobile()) {
+        config.DYE_RESOLUTION = 512;
+    }
+    if (!ext.supportLinearFiltering) {
+        config.DYE_RESOLUTION = 512;
+        config.SHADING = false;
+        config.BLOOM = false;
+        config.SUNRAYS = false;
+    }
+
+    addEventListeners();
+    startGUI();    
+    initAllShaders();
+    updateKeywords();
+    initFramebuffers();
+    multipleSplats(parseInt(Math.random() * 20) + 5);
+    
+    lastUpdateTime = Date.now();
+    colorUpdateTimer = 0.0;
+    update();
 }
 
 function pointerPrototype () {
@@ -68,27 +137,6 @@ function pointerPrototype () {
     this.moved = false;
     this.color = [30, 0, 300];
 }
-
-// ===========
-// = GLOBALS =
-// ===========
-let pointers = [];
-let splatStack = [];
-pointers.push(new pointerPrototype());
-
-const { gl, ext } = getWebGLContext(canvas);
-
-if (isMobile()) {
-    config.DYE_RESOLUTION = 512;
-}
-if (!ext.supportLinearFiltering) {
-    config.DYE_RESOLUTION = 512;
-    config.SHADING = false;
-    config.BLOOM = false;
-    config.SUNRAYS = false;
-}
-
-startGUI();
 
 function getWebGLContext (canvas) {
     const params = { alpha: true, depth: false, stencil: false, antialias: false, preserveDrawingBuffer: false };
@@ -759,7 +807,7 @@ const advectionShader = compileShader(gl.FRAGMENT_SHADER, `
     #endif
         float decay = 1.0 + dissipation * dt;
         gl_FragColor = result / decay;
-    }`,
+    } `,
     ext.supportLinearFiltering ? null : ['MANUAL_FILTERING']
 );
 
@@ -903,38 +951,6 @@ const blit = (() => {
         gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
     }
 })();
-
-let dye;
-let velocity;
-let divergence;
-let curl;
-let pressure;
-let bloom;
-let bloomFramebuffers = [];
-let sunrays;
-let sunraysTemp;
-
-let ditheringTexture = createTextureAsync('LDR_LLL1_0.png');
-
-const blurProgram            = new Program(blurVertexShader, blurShader);
-const copyProgram            = new Program(baseVertexShader, copyShader);
-const clearProgram           = new Program(baseVertexShader, clearShader);
-const colorProgram           = new Program(baseVertexShader, colorShader);
-const checkerboardProgram    = new Program(baseVertexShader, checkerboardShader);
-const bloomPrefilterProgram  = new Program(baseVertexShader, bloomPrefilterShader);
-const bloomBlurProgram       = new Program(baseVertexShader, bloomBlurShader);
-const bloomFinalProgram      = new Program(baseVertexShader, bloomFinalShader);
-const sunraysMaskProgram     = new Program(baseVertexShader, sunraysMaskShader);
-const sunraysProgram         = new Program(baseVertexShader, sunraysShader);
-const splatProgram           = new Program(baseVertexShader, splatShader);
-const advectionProgram       = new Program(baseVertexShader, advectionShader);
-const divergenceProgram      = new Program(baseVertexShader, divergenceShader);
-const curlProgram            = new Program(baseVertexShader, curlShader);
-const vorticityProgram       = new Program(baseVertexShader, vorticityShader);
-const pressureProgram        = new Program(baseVertexShader, pressureShader);
-const gradienSubtractProgram = new Program(baseVertexShader, gradientSubtractShader);
-
-const displayMaterial = new Material(baseVertexShader, displayShaderSource);
 
 function initFramebuffers () {
     let simRes = getResolution(config.SIM_RESOLUTION);
@@ -1119,14 +1135,6 @@ function updateKeywords () {
     if (config.SUNRAYS) displayKeywords.push("SUNRAYS");
     displayMaterial.setKeywords(displayKeywords);
 }
-
-updateKeywords();
-initFramebuffers();
-multipleSplats(parseInt(Math.random() * 20) + 5);
-
-let lastUpdateTime = Date.now();
-let colorUpdateTimer = 0.0;
-update();
 
 function update () {
     const dt = calcDeltaTime();
@@ -1437,28 +1445,37 @@ function correctRadius (radius) {
 // ====================
 // = USER INTERACTION =
 // ====================
-canvas.addEventListener('mousedown', e => {
+function mousedownListener(e){
+    // ETJ DEBUG
+    logEvent(e);
+    // END DEBUG    
     let posX = scaleByPixelRatio(e.offsetX);
     let posY = scaleByPixelRatio(e.offsetY);
     let pointer = pointers.find(p => p.id == -1);
     if (pointer == null)
-        pointer = new pointerPrototype();
+    pointer = new pointerPrototype();
     updatePointerDownData(pointer, -1, posX, posY);
-});
+}
 
-canvas.addEventListener('mousemove', e => {
+function mousemoveListener(e){
+    // ETJ DEBUG
+    logEvent(e);
+    // END DEBUG    
     let pointer = pointers[0];
     if (!pointer.down) return;
     let posX = scaleByPixelRatio(e.offsetX);
     let posY = scaleByPixelRatio(e.offsetY);
     updatePointerMoveData(pointer, posX, posY);
-});
+}
 
-window.addEventListener('mouseup', () => {
+function mouseupListener(e){
+    // ETJ DEBUG
+    logEvent(e);
+    // END DEBUG    
     updatePointerUpData(pointers[0]);
-});
+}
 
-canvas.addEventListener('touchstart', e => {
+function touchstartListener(e){
     e.preventDefault();
     const touches = e.targetTouches;
     while (touches.length >= pointers.length){
@@ -1469,9 +1486,9 @@ canvas.addEventListener('touchstart', e => {
         let posY = scaleByPixelRatio(touches[i].pageY);
         updatePointerDownData(pointers[i + 1], touches[i].identifier, posX, posY, touches[i].color);
     }
-});
+}
 
-canvas.addEventListener('touchmove', e => {
+function touchmoveListener(e){
     e.preventDefault();
     const touches = e.targetTouches;
     for (let i = 0; i < touches.length; i++) {
@@ -1481,9 +1498,9 @@ canvas.addEventListener('touchmove', e => {
         let posY = scaleByPixelRatio(touches[i].pageY);
         updatePointerMoveData(pointer, posX, posY);
     }
-}, false);
+}
 
-window.addEventListener('touchend', e => {
+function touchendListener(e){
     const touches = e.changedTouches;
     for (let i = 0; i < touches.length; i++)
     {
@@ -1491,15 +1508,18 @@ window.addEventListener('touchend', e => {
         if (pointer == null) continue;
         updatePointerUpData(pointer);
     }
-});
+}
 
-window.addEventListener('keydown', e => {
+function keydownListener(e){
     if (e.code === 'KeyP')
         config.PAUSED = !config.PAUSED;
     if (e.key === ' ')
         splatStack.push(parseInt(Math.random() * 20) + 5);
-});
+}
 
+// ======================
+// = POINTER MANAGEMENT =
+// ======================
 function updatePointerDownData (pointer, id, posX, posY, color) {
     pointer.id = id;
     pointer.down = true;
@@ -1540,6 +1560,9 @@ function correctDeltaY (delta) {
     return delta;
 }
 
+// =================
+// = COLOR HELPERS =
+// =================
 function generateColor () {
     let c = HSVtoRGB(Math.random(), 1.0, 1.0);
     c.r *= 0.15;
@@ -1622,3 +1645,42 @@ function hashCode (s) {
     }
     return hash;
 };
+
+// ETJ DEBUG
+function initAllShaders(){
+    blurProgram            = new Program(blurVertexShader, blurShader);
+    copyProgram            = new Program(baseVertexShader, copyShader);
+    clearProgram           = new Program(baseVertexShader, clearShader);
+    colorProgram           = new Program(baseVertexShader, colorShader);
+    checkerboardProgram    = new Program(baseVertexShader, checkerboardShader);
+    bloomPrefilterProgram  = new Program(baseVertexShader, bloomPrefilterShader);
+    bloomBlurProgram       = new Program(baseVertexShader, bloomBlurShader);
+    bloomFinalProgram      = new Program(baseVertexShader, bloomFinalShader);
+    sunraysMaskProgram     = new Program(baseVertexShader, sunraysMaskShader);
+    sunraysProgram         = new Program(baseVertexShader, sunraysShader);
+    splatProgram           = new Program(baseVertexShader, splatShader);
+    advectionProgram       = new Program(baseVertexShader, advectionShader);
+    divergenceProgram      = new Program(baseVertexShader, divergenceShader);
+    curlProgram            = new Program(baseVertexShader, curlShader);
+    vorticityProgram       = new Program(baseVertexShader, vorticityShader);
+    pressureProgram        = new Program(baseVertexShader, pressureShader);
+    gradienSubtractProgram = new Program(baseVertexShader, gradientSubtractShader);
+
+    displayMaterial = new Material(baseVertexShader, displayShaderSource);
+
+}
+
+function addEventListeners(){
+    canvas.addEventListener('mousedown', mousedownListener);
+    canvas.addEventListener('mousemove', mousemoveListener);
+    window.addEventListener('mouseup', mouseupListener);
+    canvas.addEventListener('touchstart', touchstartListener);
+    canvas.addEventListener('touchmove', touchmoveListener, false);
+    window.addEventListener('touchend', touchendListener);
+    window.addEventListener('keydown', keydownListener);
+}
+
+
+
+main();
+// END DEBUG
