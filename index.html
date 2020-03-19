@@ -107,17 +107,15 @@
         </script>
         <!-- <script async src='https://www.google-analytics.com/analytics.js'></script> -->
     </head>
+    <script src="mqttws31.min.js"></script>
+    <script type='module'>
+        import { smokeFlare } from './acc_script_additions.js';
+
+    </script>
     <body>
         <canvas style="z-index:0; "></canvas>
         <!-- ETJ DEBUG -->
         <div id="log" style="z-index: 10; width: 100%; height:50%; position:absolute; top:0; left:0;  pointer-events: none;"></div>
         <!-- END DEBUG -->
-        <!-- <script src="acc_script_additions.js" type='module'></script> -->
-        <script type='module'>
-            import { touchFlare, mouseFlare } from './acc_script_additions.js';
-            window.touchFlare = touchFlare;
-            window.mouseFlare = mouseFlare;
-            
-        </script>
     </body>
 </html>

@@ -1,9 +1,15 @@
 import {runSmoke, config, splat } from './script.js';
-import {mousedownListener, mousemoveListener, mouseupListener} from './script.js';
+export {smokeFlare};
 
-export {touchFlare, mouseFlare};
-
+// ===========
+// = GLOBALS =
+// ===========
 var DEFAULT_COLOR = {r:0.9, g:0.1, b:0.1};
+let client;
+// let topic = 'splat';
+let topic = 'flare';
+let hostname = '0.0.0.0';
+let port = '9001';
 
 // // console.log-to-div, from: https://stackoverflow.com/a/20256785
 function swapConsoleLog() {
@@ -20,13 +26,10 @@ function swapConsoleLog() {
     }
 };
 
-function remap(inputVal, fromMin, fromMax, toMin, toMax){
-    // Mirror's TouchDesigner's tdu.remap
-    let ratio = (inputVal-fromMin)/(fromMax - fromMin);
-    return toMin + ratio * (toMax - toMin);
-}
-
-function mouseFlare(startX, startY, length, nauticalDegrees, durationMillis=1000, tuningParam=1, frequencyMs=30) {
+function smokeFlare(startX, startY, length, nauticalDegrees, durationMillis=1000, tuningParam=1, frequencyMs=30) {
+    // startX, startY & length should all be in normalized coordinates ( [0,1])
+    // tuningParam affects the size of the bloom of each flare
+    // frequencyMs specifies how often (milliseconds) a splat is made
 
     // fire off a set of events in a line radially out from x,y over durationMillis.
     // let frequencyMs = 30;
@@ -47,66 +50,6 @@ function mouseFlare(startX, startY, length, nauticalDegrees, durationMillis=1000
         setTimeout(splat, frequencyMs*i, x, y, splatDx, splatDy, DEFAULT_COLOR);
     }
 }    
-function mouseFlareOrig(startX, startY, length, nauticalDegrees, durationMillis=1000) {
-
-    // fire off a set of events in a line radially out from x,y over durationMillis.
-    let frequencyMs = 30;
-    let steps = Math.trunc(durationMillis/frequencyMs);
-    let step_length = length / steps;
-
-    let eventCallback;
-    let offsetX, offsetY;
-    for (let i=0; i< steps; i+= 1){
-        // NOTE: curiously, reversing the length & degrees arguments yields
-        // a cool-looking spiral
-        [offsetX, offsetY] = polarVectorAdd(startX, startY, step_length*i, nauticalDegrees, );
-
-        if      (i==0)          { eventCallback = mousedownListener;}
-        else if (i == steps - 1){ eventCallback = mouseupListener;}
-        else                    { eventCallback = mousemoveListener;}
-
-        // console.log(`${i} x, y: ${x}, ${y},  offsets: ${offsetX}, ${offsetY}, callback: ${eventCallback}`);
-
-        setTimeout(eventCallback, frequencyMs*i, {offsetX, offsetY});
-    }
-}
-
-function touchFlare(startX, startY, length,  nauticalDegrees, durationMillis=500, color=DEFAULT_COLOR, id=42) {
-    // TODO: If this is called multiple times within durationMillis,
-    // only the last call will be valid. Real touch events would 
-    // need to include the current state of all touches, so we'd
-    // have to either:
-    // a) get info from script.js:pointers and include that in how we create touch events, or
-    // b) take an array of flare specs here and send them all to the script
-    
-    // fire off a set of events in a line radially out from x,y 
-    // over durationMillis milliseconds.
-    let frequencyMs = 30;
-    let steps = Math.trunc(durationMillis/frequencyMs);
-    let step_length = length / steps;
-
-    
-    let eventCallback;
-    let offsetX, offsetY;
-
-    let el = document.getElementsByTagName('canvas')[0];
-    let attrs = {identifier: id, color};
-
-    for (let i=0; i< steps; i+= 1){
-        // NOTE: curiously, reversing the length & degrees arguments yields
-        // a cool-looking spiral
-        [offsetX, offsetY] = polarVectorAdd(startX, startY, step_length*i, nauticalDegrees, );
-
-        if      (i==0)          { eventCallback = makeTouchStart;}
-        else if (i == steps - 1){ eventCallback = makeTouchEnd;}
-        else                    { eventCallback = makeTouchMove;}
-
-        // console.log(`${i} x, y: ${x}, ${y},  offsets: ${offsetX}, ${offsetY}, callback: ${eventCallback}`);
-
-        setTimeout(eventCallback, frequencyMs*i, el, offsetX, offsetY, attrs);
-    }
-    
-}
 
 function polarVectorAdd(xPixels, yPixels, lengthPixels, nauticalDegrees){
     // TODO: I think there's some important checking to do here to make up 
@@ -118,59 +61,6 @@ function polarVectorAdd(xPixels, yPixels, lengthPixels, nauticalDegrees){
     return [endX, endY];
 }
 
-// manually create touch event. See: https://gist.github.com/morewry/538efb737ed9c4e432e4
-function makeTouchEvent(eventName="touchstart"){
-    // Different browsers may throw errors differently? First block fails on 
-    // my desktop Firefox, but second block succeeds 
-    // -ETJ 04 December 2019
-    let e;
-    try{
-        e = document.createEvent('TouchEvent')
-        e.initTouchEvent(eventName, true, true)
-    }
-    catch (err){
-        try{
-            e = document.createEvent('UIEvent')
-            e.initUIEvent(eventName, true, true)
-        }
-        catch( err){
-            e = document.createEvent('Event')
-            e.initEvent(eventName, true, true)
-        }
-    }
-    return e;
-}
-
-function makeTouchObject(x=0, y=0, extraAttrs=null){
-    let obj = {pageX: x, pageY: y};
-    if (extraAttrs){
-        obj = Object.assign(obj, extraAttrs);
-    }
-    return obj;
-}
-
-function makeTouchStart(el, x = 0, y = 0, extraAttrs=null){
-    let e = makeTouchEvent("touchstart");
-    e.targetTouches = [makeTouchObject(x,y,extraAttrs)];
-    el.dispatchEvent(e);
-    return e;
-} 
-
-function makeTouchMove(el, x=0, y=0, extraAttrs=null){
-    let e = makeTouchEvent("touchmove");
-    e.targetTouches = [makeTouchObject(x,y,extraAttrs)];
-    el.dispatchEvent(e);
-    return e;
-}
-
-function makeTouchEnd(el, x = 0, y = 0, extraAttrs=null){
-    let e = makeTouchEvent("touchend");
-    e.changedTouches = [makeTouchObject(x,y,extraAttrs)];
-    el.dispatchEvent(e);
-    return e;
-}
-
-
 function logEvent(e){
     // console.log(``);
     let DEBUG = false;
@@ -180,16 +70,118 @@ function logEvent(e){
     }
 }
 
+function customizeConfig(config){
+    // `config` is defined in the original script.js
+    config.COLORFUL = false; // If COLORFUL, our colors get changed on us
+    // config.BACK_COLOR = { r: 255, g: 255, b: 255 }; // white background
+    // config.TRANSPARENT = true;
+}
+
+// =========
+// = MGQTT =
+// =========
+
+function initMQTTClient(){
+    /* 
+        This relies on having included the mqtt script in a <script> tag 
+        in the loading HTML. Optimally, we'd swap that out for a module import.
+        
+        Note that we also need to have a websocket-enabled MQTT broker 
+        running on hostname:port.  I've been using `mosquitto` for this. 
+     -ETJ 19 March 2020
+    */
+    // let topic = 'splat';
+    // let hostname = '0.0.0.0';
+    // let port = '9001';
+    client = new Paho.MQTT.Client(hostname, Number(port), "clientId");
+    client.connect({onSuccess:onConnect, onFailure: ()=>{}});
+
+    return client;
+}
+
+function onConnect() {
+    // let topic = 'splat';
+
+    // Once a connection has been made, make a subscription and send a message.
+    console.log("onConnect");
+    client.subscribe(topic);
+    client.onConnectionLost = onConnectionLost;
+    client.onMessageArrived = onMessageArrived;
+
+    sendMessage('Hello from browser', topic);
+
+    // message = new Paho.MQTT.Message("Hello from browser");
+    // message.destinationName = "World";
+    // client.send(message);
+}
+
+function onConnectionLost(responseObject) {
+    if (responseObject.errorCode !== 0) {
+        console.log("onConnectionLost:"+responseObject.errorMessage);
+    }
+    // ETJ DEBUG
+    else{
+        console.log(`onConnectionLost: ${responseObject}`);
+    }
+    // END DEBUG
+}
+
+function onMessageArrived(message) {
+    console.log("onMessageArrived:"+message.payloadString);
+    showLog(message.payloadString);
+    // console.log(`message: ${JSON.stringify(message, null, 4)}`);
+    // TODO: call methods based on topic called. 
+    let args;
+    try {
+        args = JSON.parse(message.payloadString);
+    }
+    catch(error){
+        console.log(`Received non-JSON MQTT info. Ignoring. Text was: \n${message.payloadString}`);
+    }
+    if (message.destinationName == 'splat'){
+        try {
+            // e.g.: {"x":0.5, "y":0.5, "dx":2000, "dy":0, "color":{"r": 0.8, "g":0.2, "b": 0.2}}
+            let {x, y, dx, dy, color} = args;
+            splat(x, y, dx, dy, color);
+        } catch (error) {
+            console.log(`splat failed: ` + error);
+        }
+    }
+    else if (message.destinationName == 'flare'){
+        try {
+            // e.g. {"startX": 0.5, "startY": 0.5 , "length": 0.3 , "nauticalDegrees":-45, "durationMillis": 300 , "tuningParam":1 , "frequencyMs": 30}
+            let {startX, startY, length, nauticalDegrees, durationMillis, tuningParam, frequencyMs} = args;
+            smokeFlare(startX, startY, length, nauticalDegrees, durationMillis, tuningParam, frequencyMs);
+        } 
+        catch (error) {
+            console.log(`smokeFlare failed: ` + error);
+        }        
+    }
+}    
+
+function showLog(msg){
+    let e = document.getElementById('log');
+    e.innerHTML += msg + '<br/>';
+}
+
+function sendMessage(text, topic='splat'){
+    console.log('sendMessage()');
+    let message = new Paho.MQTT.Message(text);
+    message.destinationName = topic;
+    client.send(message);
+
+}
+
+
+
+
 // ===============
 // = ENTRY POINT =
 // ===============
 function main(){
     // swapConsoleLog();
-    // `config` is defined in the original script.js
-    config.COLORFUL = false; // If COLORFUL, our colors get changed on us
-    // config.BACK_COLOR = { r: 255, g: 255, b: 255 }; // white background
-
-    // config.TRANSPARENT = true;
+    customizeConfig(config);
+    initMQTTClient(); 
     runSmoke();
 }
 main();
