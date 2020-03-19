@@ -1,3 +1,8 @@
+import {runSmoke, config, splat } from './script.js';
+import {mousedownListener, mousemoveListener, mouseupListener} from './script.js';
+
+export {touchFlare, mouseFlare};
+
 var DEFAULT_COLOR = {r:0.9, g:0.1, b:0.1};
 
 // // console.log-to-div, from: https://stackoverflow.com/a/20256785
@@ -21,38 +26,86 @@ function remap(inputVal, fromMin, fromMax, toMin, toMax){
     return toMin + ratio * (toMax - toMin);
 }
 
-function touchFlare(startX, startY, length,  nauticalDegrees, durationMillis=500, color=DEFAULT_COLOR, id=42) {
+function mouseFlare(startX, startY, length, nauticalDegrees, durationMillis=1000, tuningParam=1, frequencyMs=30) {
 
-    // let startX, startY, and length be integer pixel values
-    // At some frame rate, send touch events simulating a finger in a straight line
-    // over `duration` seconds.
-    // ETJ DEBUG
-    // console.log(`canvas: (${canvas.width}, ${canvas.height})`);
-    // END DEBUG
-    let endX, endY; 
-    [endX, endY] = polarVectorAdd(startX, startY, length, nauticalDegrees);
-    let el = document.getElementsByTagName('canvas')[0];
-    
-    let attrs = {identifier: id, color}
-    let startEvent = makeTouchStart(el, startX, startY, attrs);
+    // fire off a set of events in a line radially out from x,y over durationMillis.
+    // let frequencyMs = 30;
+    let steps = Math.trunc(durationMillis/frequencyMs);
+    let step_length = length / steps;
+    let x, y;
+    let [dx, dy] = polarVectorAdd(startX, startY, step_length, 180- nauticalDegrees);
+    dx -= startX;
+    dy -= startY;
 
-    id = startEvent.targetTouches[0].identifier;
+    let splatDx = dx * tuningParam * config.SPLAT_FORCE;
+    let splatDy = dy * tuningParam * config.SPLAT_FORCE;
 
-    let fps = 60; 
-    // let steps = fps * durationMillis / 1000; 
-    let steps = length/50;
-    let dt = durationMillis/steps;
-    for (let t = dt; t < durationMillis; t += dt){
-        let x = remap(t, 0, durationMillis, startX, endX);
-        let y = remap(t, 0, durationMillis, startY, endY);
-        let eventCallback = () => { 
-            makeTouchMove(el, x, y, attrs);
-        }
-        setTimeout( eventCallback, t);
+    console.log(`mouseFlare: ${startX}, ${startY}, ${step_length} ${dx} ${dy}`);
+    for (let i = 0; i< steps; i+= 1){
+        x = startX + i * dx;
+        y = startY + i * dy;
+        setTimeout(splat, frequencyMs*i, x, y, splatDx, splatDy, DEFAULT_COLOR);
     }
-    // TODO: Do we need this touchend event?
-    setTimeout(() => {makeTouchEnd(el, endX, endY, attrs)}, durationMillis);
+}    
+function mouseFlareOrig(startX, startY, length, nauticalDegrees, durationMillis=1000) {
 
+    // fire off a set of events in a line radially out from x,y over durationMillis.
+    let frequencyMs = 30;
+    let steps = Math.trunc(durationMillis/frequencyMs);
+    let step_length = length / steps;
+
+    let eventCallback;
+    let offsetX, offsetY;
+    for (let i=0; i< steps; i+= 1){
+        // NOTE: curiously, reversing the length & degrees arguments yields
+        // a cool-looking spiral
+        [offsetX, offsetY] = polarVectorAdd(startX, startY, step_length*i, nauticalDegrees, );
+
+        if      (i==0)          { eventCallback = mousedownListener;}
+        else if (i == steps - 1){ eventCallback = mouseupListener;}
+        else                    { eventCallback = mousemoveListener;}
+
+        // console.log(`${i} x, y: ${x}, ${y},  offsets: ${offsetX}, ${offsetY}, callback: ${eventCallback}`);
+
+        setTimeout(eventCallback, frequencyMs*i, {offsetX, offsetY});
+    }
+}
+
+function touchFlare(startX, startY, length,  nauticalDegrees, durationMillis=500, color=DEFAULT_COLOR, id=42) {
+    // TODO: If this is called multiple times within durationMillis,
+    // only the last call will be valid. Real touch events would 
+    // need to include the current state of all touches, so we'd
+    // have to either:
+    // a) get info from script.js:pointers and include that in how we create touch events, or
+    // b) take an array of flare specs here and send them all to the script
+    
+    // fire off a set of events in a line radially out from x,y 
+    // over durationMillis milliseconds.
+    let frequencyMs = 30;
+    let steps = Math.trunc(durationMillis/frequencyMs);
+    let step_length = length / steps;
+
+    
+    let eventCallback;
+    let offsetX, offsetY;
+
+    let el = document.getElementsByTagName('canvas')[0];
+    let attrs = {identifier: id, color};
+
+    for (let i=0; i< steps; i+= 1){
+        // NOTE: curiously, reversing the length & degrees arguments yields
+        // a cool-looking spiral
+        [offsetX, offsetY] = polarVectorAdd(startX, startY, step_length*i, nauticalDegrees, );
+
+        if      (i==0)          { eventCallback = makeTouchStart;}
+        else if (i == steps - 1){ eventCallback = makeTouchEnd;}
+        else                    { eventCallback = makeTouchMove;}
+
+        // console.log(`${i} x, y: ${x}, ${y},  offsets: ${offsetX}, ${offsetY}, callback: ${eventCallback}`);
+
+        setTimeout(eventCallback, frequencyMs*i, el, offsetX, offsetY, attrs);
+    }
+    
 }
 
 function polarVectorAdd(xPixels, yPixels, lengthPixels, nauticalDegrees){
@@ -117,15 +170,26 @@ function makeTouchEnd(el, x = 0, y = 0, extraAttrs=null){
     return e;
 }
 
+
+function logEvent(e){
+    // console.log(``);
+    let DEBUG = false;
+    // DEBUG = true;
+    if (DEBUG){
+        console.log(`${Date.now()} ${e.type} (${e.offsetX}, ${e.offsetY})`);
+    }
+}
+
 // ===============
 // = ENTRY POINT =
 // ===============
 function main(){
-    swapConsoleLog();
+    // swapConsoleLog();
     // `config` is defined in the original script.js
     config.COLORFUL = false; // If COLORFUL, our colors get changed on us
-    config.BACK_COLOR = { r: 255, g: 255, b: 255 }; // white background
+    // config.BACK_COLOR = { r: 255, g: 255, b: 255 }; // white background
 
     // config.TRANSPARENT = true;
+    runSmoke();
 }
 main();

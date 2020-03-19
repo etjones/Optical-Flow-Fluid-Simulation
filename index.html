@@ -111,10 +111,13 @@
         <canvas style="z-index:0; "></canvas>
         <!-- ETJ DEBUG -->
         <div id="log" style="z-index: 10; width: 100%; height:50%; position:absolute; top:0; left:0;  pointer-events: none;"></div>
-        <!-- background-color: #ff000080; -->
         <!-- END DEBUG -->
-        <script src="./script.js"></script>
-        <script src="./acc_script_additions.js"></script>
-
+        <!-- <script src="acc_script_additions.js" type='module'></script> -->
+        <script type='module'>
+            import { touchFlare, mouseFlare } from './acc_script_additions.js';
+            window.touchFlare = touchFlare;
+            window.mouseFlare = mouseFlare;
+            
+        </script>
     </body>
 </html>

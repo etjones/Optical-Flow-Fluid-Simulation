@@ -21,9 +21,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-
-'use strict';
-
+export {runSmoke, config};
+export {mousedownListener, mousemoveListener, mouseupListener};
+export {pointers, splat};
 
 const canvas = document.getElementsByTagName('canvas')[0];
 // resizeCanvas();
@@ -73,7 +73,7 @@ let ditheringTexture = createTextureAsync('LDR_LLL1_0.png');
 // ===============
 // = ENTRY POINT =
 // ===============
-function main(){
+function runSmoke(){
     config = {
         SIM_RESOLUTION: 128,
         DYE_RESOLUTION: 1024,
@@ -1394,7 +1394,7 @@ function blur (target, temp, iterations) {
     }
 }
 
-function splatPointer (pointer) {
+function splatPointer(pointer) {
     // ETJ DEBUG
     // console.log(`splatPointer: ${JSON.stringify(pointer, null, 4)}`);
     // END DEBUG
@@ -1418,6 +1418,8 @@ function multipleSplats (amount) {
 }
 
 function splat (x, y, dx, dy, color) {
+    console.log(`splat: ${x}, ${y}, ${dx}, ${dy}, ${color}`);
+
     gl.viewport(0, 0, velocity.width, velocity.height);
     splatProgram.bind();
     gl.uniform1i(splatProgram.uniforms.uTarget, velocity.read.attach(0));
@@ -1446,9 +1448,6 @@ function correctRadius (radius) {
 // = USER INTERACTION =
 // ====================
 function mousedownListener(e){
-    // ETJ DEBUG
-    logEvent(e);
-    // END DEBUG    
     let posX = scaleByPixelRatio(e.offsetX);
     let posY = scaleByPixelRatio(e.offsetY);
     let pointer = pointers.find(p => p.id == -1);
@@ -1457,10 +1456,7 @@ function mousedownListener(e){
     updatePointerDownData(pointer, -1, posX, posY);
 }
 
-function mousemoveListener(e){
-    // ETJ DEBUG
-    logEvent(e);
-    // END DEBUG    
+function mousemoveListener(e){  
     let pointer = pointers[0];
     if (!pointer.down) return;
     let posX = scaleByPixelRatio(e.offsetX);
@@ -1468,10 +1464,7 @@ function mousemoveListener(e){
     updatePointerMoveData(pointer, posX, posY);
 }
 
-function mouseupListener(e){
-    // ETJ DEBUG
-    logEvent(e);
-    // END DEBUG    
+function mouseupListener(e){ 
     updatePointerUpData(pointers[0]);
 }
 
@@ -1482,6 +1475,9 @@ function touchstartListener(e){
         pointers.push(new pointerPrototype());
     }
     for (let i = 0; i < touches.length; i++) {
+        // ETJ DEBUG
+        console.log(`Updating pointers[${i + 1}]: id: ${touches[i].identifier}`)
+        // END DEBUG
         let posX = scaleByPixelRatio(touches[i].pageX);
         let posY = scaleByPixelRatio(touches[i].pageY);
         updatePointerDownData(pointers[i + 1], touches[i].identifier, posX, posY, touches[i].color);
@@ -1682,5 +1678,5 @@ function addEventListeners(){
 
 
 
-main();
+// main();
 // END DEBUG
