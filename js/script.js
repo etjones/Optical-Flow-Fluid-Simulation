@@ -1418,7 +1418,9 @@ function multipleSplats (amount) {
 }
 
 function splat (x, y, dx, dy, color) {
-    console.log(`splat: ${x}, ${y}, ${dx}, ${dy}, ${color}`);
+    // ETJ DEBUG
+    // console.log(`splat: ${x}, ${y}, ${dx}, ${dy}, ${color}`);
+    // END DEBUG
 
     gl.viewport(0, 0, velocity.width, velocity.height);
     splatProgram.bind();

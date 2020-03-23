@@ -1,11 +1,18 @@
 import {runSmoke, config, splat } from './script.js';
-export {smokeFlare};
+// import {WebCamFlow} from './oflow.js';
+// import * as oflow from './oflow.js';
 
+export {smokeFlare};
 // ===========
 // = GLOBALS =
 // ===========
-var DEFAULT_COLOR = {r:0.9, g:0.1, b:0.1};
+const DEFAULT_COLOR = {r:0.9, g:0.1, b:0.1};
+// FIXME: find an actual purple color...
+const PURPLE_COLOR = {r:0.8, g:0.1, b:0.3};
+let oflowFramesSeen = 0;
 let client;
+let webCamFlow;
+
 // let topic = 'splat';
 let topic = 'flare';
 let hostname = '0.0.0.0';
@@ -173,16 +180,99 @@ function sendMessage(text, topic='splat'){
 
 }
 
+// ================
+// = OPTICAL FLOW =
+// ================
+function initOpticalFlow(videoElement, zoneSize = 16) {
+    console.log(`initOpticalFlow()`);
+    console.log(`videoElement: ${Object.keys(videoElement)}`);
+    // let keys= Object.keys(oflow);
+    // let keys = [];
+    // for (let k in oflow){ keys.push(k);}
+    // console.log(`keys: ${JSON.stringify(keys, null, 4)}`);
+    webCamFlow = new oflow.WebCamFlow(videoElement, zoneSize);
+    webCamFlow.onCalculated(oflowCallback);
+    webCamFlow.startCapture();
+
+}
+
+function oflowCallback(flowStructure){
+    oflowFramesSeen += 1;
+
+    let {zones} = flowStructure;
+    // The onCalculated() function gets called more often than we get new
+    // camera frames, meaning we often get called with redundant, all-zero
+    // values for flowStructure.zones. Return if that's the case so we don't
+    // get bad flicker.
+    // TODO: this could probably be done faster by just checking a few values, 
+    // rather than reducing the entire array. 
+    let nonZeroCount = flowStructure.zones.reduce((prev, cur) => {return prev + (Math.abs(cur.u) < 1? 0: 1)}, 0);
+    if (nonZeroCount == 0){
+        return;
+    }
+
+    let skipFrames = 2;
+    if (oflowFramesSeen%skipFrames == 0){
+        alterSmokeFromFlow(flowStructure.zones);
+    }
+
+}
+
+function alterSmokeFromFlow( zones){
+    /*
+    zones is a list: [{x:intPixels, y:intPixels, u:float, v:float}, {x,y,u,v}]
+    */  
+    // FIXME: get these from the video element directly. Note that this 
+    // isn't the same as the CSS size of the element
+    let elementHeight = 480;
+    let elementWidth = 640;
+
+    let normalX = 1.0/elementWidth;
+    let normalY = 1.0/elementHeight;
+
+    let maxFlares = 2;
+    let flareThreshold = 200;
+    let flareMinDistance = 0.05;
+
+    let zoneMagSquared = ({x,y,u,v}) => {return (u*u + v*v)}; 
+    let zoneDistanceSquared = (a,b) => { return ((a.x-b.x)*(a.x-b.x) + (a.y - b.y)*(a.y - b.y))};
+    let normalizeZone = ({x,y,u,v}) => {return {x:x*normalX, y:y*normalY, u, v}};
+    let sortedZones = zones.sort((a,b)=> zoneMagSquared(b) - zoneMagSquared(a) ); // highest first
+
+    // We want to make flares at points that: 
+    // a) have at least a minimum motion magnitude, and
+    // b) aren't right next to each other,
+    // We'll only take maxFlares.
+    let zonesToFlare = [];
+    for (let i=0; i< sortedZones.length; i+=1){
+        let z = normalizeZone(sortedZones[i]);
+        if (zonesToFlare.length == maxFlares || // Do we have all the flares we want?
+            zoneMagSquared(z) < flareThreshold){    // Or are there no more flareable zones?
+            break;
+        }
+        if (zonesToFlare.every((ztf)=> zoneDistanceSquared(ztf, z) >= flareMinDistance)){
+            zonesToFlare.push(z);
+        }
+    }
+
+    let multiplier = 10;
+    // let msgs = zonesToFlare.map(({x,y,u,v}))
+    zonesToFlare.forEach(({x,y,u,v})=> splat(1-x,1-y,(1-u)*multiplier,(1-v)*multiplier, PURPLE_COLOR));
+       
+}
+
 
 
 
 // ===============
 // = ENTRY POINT =
 // ===============
-function main(){
+export function main(){
     // swapConsoleLog();
     customizeConfig(config);
+    let videoElement = document.getElementById('videoOut');
+    initOpticalFlow(videoElement);
     initMQTTClient(); 
     runSmoke();
 }
-main();
+// main();

@@ -21,11 +21,6 @@
         <meta property="og:url" content="https://paveldogreat.github.io/WebGL-Fluid-Simulation/">
         <meta property="og:image" content="https://paveldogreat.github.io/WebGL-Fluid-Simulation/logo.png">
 
-        <script type="text/javascript" src="js/dat.gui.min.js"></script>
-        <script src="js/mqttws31.min.js"></script>
-        <script type='module'>
-            import { smokeFlare } from './js/acc_script_additions.js';
-        </script>        
         <style>
             * {
                 user-select: none;
@@ -104,18 +99,26 @@
                 content: 'd';
             }
         </style>
+        
+        <script type="text/javascript" src="js/dat.gui.min.js"></script>
+        <script src="js/mqttws31.min.js"></script>
+        <script src="js/oflow.js"></script>
+        <script type='module'>
+            import { smokeFlare, main as scriptMain } from './js/acc_script_additions.js';
+            scriptMain()
+        
+        </script>        
 
-        <!-- <script>
-            window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
-            // ga('create', 'UA-105392568-1', 'auto');
-            // ga('send', 'pageview');
-        </script> -->
-        <!-- <script async src='https://www.google-analytics.com/analytics.js'></script> -->
+
     </head>
     <body>
         <canvas style="z-index:0; "></canvas>
         <!-- ETJ DEBUG -->
-        <div id="log" style="z-index: 10; width: 100%; height:50%; position:absolute; top:0; left:0;  pointer-events: none;"></div>
+        <!-- <div id="log" style="z-index: 10; width: 100%; height:50%; position:absolute; top:0; left:0;  pointer-events: none;"></div> -->
         <!-- END DEBUG -->
+        <video id="videoOut" width="320px" height="240px" 
+                style="z-index: 10; transform: 
+                scale(-1,1); visibility:hidden; position:absolute; top:0; left:0;">
+            </video>
     </body>
 </html>
