@@ -272,7 +272,7 @@ export function main(){
     customizeConfig(config);
     let videoElement = document.getElementById('videoOut');
     initOpticalFlow(videoElement);
-    initMQTTClient(); 
+    // initMQTTClient(); 
     runSmoke();
 }
 // main();
