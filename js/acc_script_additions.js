@@ -230,7 +230,7 @@ function alterSmokeFromFlow( zones){
     let normalX = 1.0/elementWidth;
     let normalY = 1.0/elementHeight;
 
-    let maxFlares = 2;
+    let maxFlares = 1;
     let flareThreshold = 200;
     let flareMinDistance = 0.05;
 
