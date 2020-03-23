@@ -9,8 +9,8 @@
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="mobile-web-app-capable" content="yes">
 
-        <link rel="apple-touch-icon" href="logo.png">
-        <link rel="icon" href="logo.png">
+        <link rel="apple-touch-icon" href="assets/logo.png">
+        <link rel="icon" href="assets/logo.png">
 
         <title>WebGL Fluid Simulation</title>
         <meta name="description" content="A WebGL fluid simulation that works in mobile browsers.">
@@ -21,7 +21,11 @@
         <meta property="og:url" content="https://paveldogreat.github.io/WebGL-Fluid-Simulation/">
         <meta property="og:image" content="https://paveldogreat.github.io/WebGL-Fluid-Simulation/logo.png">
 
-        <script type="text/javascript" src="dat.gui.min.js"></script>
+        <script type="text/javascript" src="js/dat.gui.min.js"></script>
+        <script src="js/mqttws31.min.js"></script>
+        <script type='module'>
+            import { smokeFlare } from './js/acc_script_additions.js';
+        </script>        
         <style>
             * {
                 user-select: none;
@@ -54,7 +58,7 @@
 
             @font-face {
                 font-family: 'iconfont';
-                src: url('iconfont.ttf') format('truetype');
+                src: url('assets/iconfont.ttf') format('truetype');
             }
 
             .bigFont {
@@ -100,18 +104,14 @@
                 content: 'd';
             }
         </style>
-        <script>
+
+        <!-- <script>
             window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
             // ga('create', 'UA-105392568-1', 'auto');
             // ga('send', 'pageview');
-        </script>
+        </script> -->
         <!-- <script async src='https://www.google-analytics.com/analytics.js'></script> -->
     </head>
-    <script src="mqttws31.min.js"></script>
-    <script type='module'>
-        import { smokeFlare } from './acc_script_additions.js';
-
-    </script>
     <body>
         <canvas style="z-index:0; "></canvas>
         <!-- ETJ DEBUG -->

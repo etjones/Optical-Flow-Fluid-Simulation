@@ -137,6 +137,7 @@ function onMessageArrived(message) {
     }
     catch(error){
         console.log(`Received non-JSON MQTT info. Ignoring. Text was: \n${message.payloadString}`);
+        return;
     }
     if (message.destinationName == 'splat'){
         try {
