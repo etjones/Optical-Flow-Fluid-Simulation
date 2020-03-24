@@ -7,8 +7,8 @@ export {smokeFlare};
 // = GLOBALS =
 // ===========
 const DEFAULT_COLOR = {r:0.9, g:0.1, b:0.1};
-// FIXME: find an actual purple color...
-const PURPLE_COLOR = {r:0.8, g:0.1, b:0.3};
+// Accenture purple
+const PURPLE_COLOR = {r:0.45, g:0.28, b:0.6};
 let oflowFramesSeen = 0;
 let client;
 let webCamFlow;
